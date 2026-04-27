@@ -52,13 +52,18 @@ project-chats.sh --src /path/to/uuid.jsonl
 Single purpose: **move a Claude Code session from one project to another.**
 
 ```bash
-project-chats.sh --src <path/to/uuid.jsonl> [--dst <dir>] [--dst-project <name>] [--dst-name <name>]
+project-chats.sh --src <path/to/uuid.jsonl> [--dst-dir <dir>] [--dst-project <name>] [--dst-name <name>]
 
   --src <file>           Full path to source JSONL session file (required)
-  --dst <dir>            Destination project directory (default: current directory)
-  --dst-project <name>   Project name for claude-history display (default: basename of --dst)
+  --dst-dir <dir>        Destination project directory (default: current directory).
+                         **Must exist as a real directory, OR --dst-project must be provided.**
+  --dst-project <name>   Project name for claude-history display.
+                         Default: basename of --dst-dir (if --dst-dir exists).
+                         Required if: --dst-dir path does not exist on disk.
   --dst-name <name>      Symlink name in ~/.claude/chats/<project>/ (default: customTitle → UUID)
 ```
+
+**Important:** `--dst-dir` specifies where Claude Code will store the session. If the directory doesn't exist, you must explicitly pass `--dst-project <name>` to confirm intent—this prevents typos from silently creating unintended project names.
 
 ### What happens when you run it
 
@@ -94,7 +99,7 @@ project-chats.sh --src ~/.claude/projects/-mnt-nfs-Florian-Gin-AI-tmp/abc12345-.
 ```bash
 project-chats.sh \
   --src ~/.claude/projects/-mnt-nfs-Florian-Gin-AI-projects-HomeAI/abc123.jsonl \
-  --dst ~/Gin-AI/projects/claude-orchestra
+  --dst-dir ~/Gin-AI/projects/claude-orchestra
 ```
 
 ### Move with custom session display name
@@ -102,7 +107,7 @@ project-chats.sh \
 ```bash
 project-chats.sh \
   --src ~/.claude/projects/-mnt-nfs-Florian-Gin-AI-tmp/uuid.jsonl \
-  --dst ~/Gin-AI/projects/HomeAI \
+  --dst-dir ~/Gin-AI/projects/HomeAI \
   --dst-project homeai \
   --dst-name "setup-session"
 ```

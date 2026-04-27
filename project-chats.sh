@@ -4,15 +4,15 @@
 # Move a Claude Code session to a project directory and register it in ~/.claude/chats/
 #
 # Usage:
-#   project-chats.sh --src <path/to/uuid.jsonl> [--dst <dir>] [--dst-project <name>] [--dst-name <name>]
+#   project-chats.sh --src <path/to/uuid.jsonl> [--dst-dir <dir>] [--dst-project <name>] [--dst-name <name>]
 #
 # Arguments:
 #   --src <file>           Path to source JSONL session file (required).
 #                          Must be an absolute path to <uuid>.jsonl in ~/.claude/projects/<mangled>/
-#   --dst <dir>            Destination project directory (default: current working directory).
+#   --dst-dir <dir>        Destination project directory (default: current working directory).
 #                          Session is moved from source Claude Code project dir to this directory's mangled path.
 #   --dst-project <name>   Project name displayed in claude-history and used for ~/.claude/chats/ grouping.
-#                          Default: basename of --dst directory.
+#                          Default: basename of --dst-dir directory.
 #   --dst-name <name>      Symlink filename in ~/.claude/chats/<project>/.
 #                          Default: customTitle from the JSONL, fallback to UUID if no title set.
 #
@@ -24,7 +24,7 @@
 #   # Move to HomeAI with explicit project and session names
 #   project-chats.sh \
 #     --src ~/.claude/projects/-mnt-nfs-Florian-Gin-AI-tmp/abc123.jsonl \
-#     --dst ~/Gin-AI/projects/HomeAI \
+#     --dst-dir ~/Gin-AI/projects/HomeAI \
 #     --dst-project homeai \
 #     --dst-name "setup-session"
 #
@@ -43,11 +43,11 @@ PROJECTS_BASE="$HOME/.claude/projects"
 # Show help if no arguments
 if [ $# -eq 0 ]; then
   cat >&2 << 'EOF'
-Usage: project-chats.sh --src <path/to/uuid.jsonl> [--dst <dir>] [--dst-project <name>] [--dst-name <name>]
+Usage: project-chats.sh --src <path/to/uuid.jsonl> [--dst-dir <dir>] [--dst-project <name>] [--dst-name <name>]
 
   --src <file>           Path to source JSONL session file (required)
-  --dst <dir>            Destination project directory (default: current directory)
-  --dst-project <name>   Project name for claude-history (default: basename of --dst)
+  --dst-dir <dir>        Destination project directory (default: current directory)
+  --dst-project <name>   Project name for claude-history (default: basename of --dst-dir)
   --dst-name <name>      Session symlink name (default: customTitle from JSONL, fallback: UUID)
 
 Examples:
@@ -56,7 +56,7 @@ Examples:
 
   project-chats.sh \
     --src ~/.claude/projects/-mnt-nfs-Florian-Gin-AI-tmp/abc123.jsonl \
-    --dst ~/Gin-AI/projects/HomeAI \
+    --dst-dir ~/Gin-AI/projects/HomeAI \
     --dst-project homeai \
     --dst-name "session-name"
 EOF
@@ -80,13 +80,13 @@ while [ $# -gt 0 ]; do
       SRC_JSONL="${1#--src=}"
       shift
       ;;
-    --dst)
-      [ $# -lt 2 ] && { echo "Error: --dst requires an argument" >&2; exit 1; }
+    --dst-dir)
+      [ $# -lt 2 ] && { echo "Error: --dst-dir requires an argument" >&2; exit 1; }
       DST_DIR="$2"
       shift 2
       ;;
-    --dst=*)
-      DST_DIR="${1#--dst=}"
+    --dst-dir=*)
+      DST_DIR="${1#--dst-dir=}"
       shift
       ;;
     --dst-project)
@@ -146,7 +146,31 @@ DST_PROJECTS_DIR="$PROJECTS_BASE/$DST_MANGLED"
 DST_JSONL="$DST_PROJECTS_DIR/${UUID}.jsonl"
 DST_META="$DST_PROJECTS_DIR/$UUID"
 
-# Default project name
+# Guard: if --dst-dir doesn't exist, require explicit --dst-project
+if [ ! -d "$DST_DIR" ]; then
+  if [ -z "$DST_PROJECT" ]; then
+    cat >&2 << EOF
+Error: --dst-dir path does not exist, and --dst-project not specified
+
+  --dst-dir: $DST_DIR
+
+If this is a typo, check the path and try again.
+If you intend to create a virtual project (directory NOT created on disk):
+  - Add: --dst-project <name>
+  - This registers the session under a logical project name
+  - Claude Code's ~/.claude/projects/<mangled>/ dir is created automatically
+  - But ~/Gin-AI/projects/<name>/ is NOT created
+
+Example:
+  project-chats.sh --src <uuid.jsonl> \\
+    --dst-dir ~/Gin-AI/projects/troubleshooting \\
+    --dst-project troubleshooting
+EOF
+    exit 1
+  fi
+fi
+
+# Default project name (when --dst exists or --dst-project was provided)
 if [ -z "$DST_PROJECT" ]; then
   DST_PROJECT="$(basename "$DST_DIR")"
 fi
