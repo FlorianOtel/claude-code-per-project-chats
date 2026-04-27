@@ -105,10 +105,6 @@ fi
 mkdir -p "$PROJECT_DIR"
 echo "✓ $PROJECT_DIR"
 
-# Write project name file for claude-history to use as the authoritative source
-# This ensures moved/reorganized sessions show the correct project name
-echo "$PROJECT_NAME" > "$PROJECT_DIR/.project-name"
-
 # Create chats project subdir
 mkdir -p "$CHATS_PROJECT_DIR"
 echo "✓ $CHATS_PROJECT_DIR"
@@ -213,6 +209,10 @@ for pair in "$@"; do
   SESSION_FILE="$PROJECT_DIR/${UUID}.jsonl"
   SYMLINK_PATH="$CHATS_PROJECT_DIR/${SESSION_NAME}.jsonl"
   RELATIVE_TARGET="../../projects/${MANGLED_PATH}/${UUID}.jsonl"
+
+  # Write per-session project name sidecar for claude-history
+  # This ensures correct project name display even when multiple projects share the same path
+  echo "$PROJECT_NAME" > "$PROJECT_DIR/${UUID}.project-name"
 
   if [ -z "$MOVE_FROM_PATH" ] && [ ! -f "$SESSION_FILE" ]; then
     echo "Warning: $SESSION_FILE not found — symlink will be dangling" >&2
