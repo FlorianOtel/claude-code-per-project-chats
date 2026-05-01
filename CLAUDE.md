@@ -1,9 +1,9 @@
 ---
 title: "Claude Code — Per-Project Chat Session Index (chats/ convention)"
-date: 2026-04-25
+created_at: 20260425-000000
 created_by: Claude Code (Claude Sonnet 4.6)
 updated_by: Claude Code (Claude Sonnet 4.6)
-updated_on: 2026-04-27
+updated_at: 20260427-224343
 context: >
   Session covering the design and implementation of ~/.claude/chats/ as a
   human-readable, per-project index over Claude Code's opaque UUID-based
@@ -146,9 +146,11 @@ All moves include:
 
 | Layer | File | Purpose |
 |---|---|---|
-| Standing rule | `~/.claude/CLAUDE.md` | Global per-project session management |
+| Standing rule | `~/.claude/CLAUDE.md` | Global summary — **must be updated in sync with this file** |
 | Automation | `~/.claude/scripts/project-chats.sh` | Move sessions with one command |
 | Authoritative registry | `claude-history` CLI | Complete, always up to date |
+
+> **Sync obligation:** `~/.claude/CLAUDE.md` lives outside this repo and is not updated by git commits. When the script interface or workflow changes here, update the "Chat Session Organization" section there too. It was missed in commit `b7faa21` — don't repeat that.
 
 ---
 
