@@ -38,7 +38,7 @@
 set -euo pipefail
 
 CHATS_BASE="$HOME/.claude/chats"
-PROJECTS_BASE="$HOME/.claude/projects"
+PROJECTS_BASE="$(realpath -m "$HOME/.claude/projects")"
 
 # Show help if no arguments
 if [ $# -eq 0 ]; then
@@ -175,21 +175,23 @@ if [ -z "$DST_PROJECT" ]; then
   DST_PROJECT="$(basename "$DST_DIR")"
 fi
 
-# Check: source and destination dirs must differ
+# Check: source and destination dirs must differ (register-only when same)
+REGISTER_ONLY=0
 if [ "$SRC_DIR" = "$DST_PROJECTS_DIR" ]; then
-  echo "Error: source and destination are the same directory — nothing to move" >&2
-  exit 1
+  REGISTER_ONLY=1
 fi
 
-# Safety checks: no clobber
-if [ -e "$DST_JSONL" ]; then
-  echo "Error: destination JSONL already exists (would clobber): $DST_JSONL" >&2
-  exit 1
-fi
+# Safety checks: no clobber (skip when already in place)
+if [ "$REGISTER_ONLY" -eq 0 ]; then
+  if [ -e "$DST_JSONL" ]; then
+    echo "Error: destination JSONL already exists (would clobber): $DST_JSONL" >&2
+    exit 1
+  fi
 
-if [ -d "$SRC_META" ] && [ -e "$DST_META" ]; then
-  echo "Error: destination metadata dir would be clobbered: $DST_META" >&2
-  exit 1
+  if [ -d "$SRC_META" ] && [ -e "$DST_META" ]; then
+    echo "Error: destination metadata dir would be clobbered: $DST_META" >&2
+    exit 1
+  fi
 fi
 
 # Derive session name: customTitle from JSONL (if exists), fallback to UUID, override with --dst-name
@@ -203,74 +205,81 @@ if [ -z "$DST_NAME" ]; then
   fi
 fi
 
-# Record source state (for integrity checks)
-SRC_SIZE=$(stat -c%s "$SRC_JSONL" 2>/dev/null || stat -f%z "$SRC_JSONL" 2>/dev/null || echo "0")
-HAS_META=0
-[ -d "$SRC_META" ] && HAS_META=1
-
-echo "Moving session $UUID"
+if [ "$REGISTER_ONLY" -eq 1 ]; then
+  echo "Registering session $UUID (already in destination directory)"
+else
+  echo "Moving session $UUID"
+fi
 echo "  Project: $DST_PROJECT"
 echo "  Display: $DST_NAME"
-if [ "$HAS_META" -eq 1 ]; then
-  echo "  With metadata dir"
-fi
 echo ""
 
 # Create destination project dir
 mkdir -p "$DST_PROJECTS_DIR"
 echo "✓ $DST_PROJECTS_DIR"
 
-# Move JSONL
-echo "  Moving $SRC_JSONL"
-echo "       → $DST_JSONL"
-mv "$SRC_JSONL" "$DST_JSONL"
+if [ "$REGISTER_ONLY" -eq 0 ]; then
+  # Record source state (for integrity checks)
+  SRC_SIZE=$(stat -c%s "$SRC_JSONL" 2>/dev/null || stat -f%z "$SRC_JSONL" 2>/dev/null || echo "0")
+  HAS_META=0
+  [ -d "$SRC_META" ] && HAS_META=1
 
-# Move metadata dir if present
-if [ "$HAS_META" -eq 1 ]; then
-  echo "  Moving $SRC_META/"
-  echo "       → $DST_META/"
-  mv "$SRC_META" "$DST_META"
-fi
+  if [ "$HAS_META" -eq 1 ]; then
+    echo "  With metadata dir"
+  fi
 
-# Integrity checks
-echo ""
-echo "Integrity checks:"
+  # Move JSONL
+  echo "  Moving $SRC_JSONL"
+  echo "       → $DST_JSONL"
+  mv "$SRC_JSONL" "$DST_JSONL"
 
-if [ ! -f "$DST_JSONL" ]; then
-  echo "✗ FAILED: destination JSONL missing" >&2
-  exit 1
-fi
-echo "  ✓ destination JSONL exists"
+  # Move metadata dir if present
+  if [ "$HAS_META" -eq 1 ]; then
+    echo "  Moving $SRC_META/"
+    echo "       → $DST_META/"
+    mv "$SRC_META" "$DST_META"
+  fi
 
-if [ ! -s "$DST_JSONL" ]; then
-  echo "✗ FAILED: destination JSONL is empty" >&2
-  exit 1
-fi
-echo "  ✓ destination JSONL non-empty"
+  # Integrity checks
+  echo ""
+  echo "Integrity checks:"
 
-DST_SIZE=$(stat -c%s "$DST_JSONL" 2>/dev/null || stat -f%z "$DST_JSONL" 2>/dev/null || echo "0")
-if [ "$SRC_SIZE" != "$DST_SIZE" ]; then
-  echo "✗ FAILED: size mismatch (src=$SRC_SIZE dst=$DST_SIZE)" >&2
-  exit 1
-fi
-echo "  ✓ size match ($SRC_SIZE bytes)"
-
-if [ -f "$SRC_JSONL" ]; then
-  echo "✗ FAILED: source JSONL still exists" >&2
-  exit 1
-fi
-echo "  ✓ source JSONL removed"
-
-if [ "$HAS_META" -eq 1 ]; then
-  if [ ! -d "$DST_META" ]; then
-    echo "✗ FAILED: destination metadata dir missing" >&2
+  if [ ! -f "$DST_JSONL" ]; then
+    echo "✗ FAILED: destination JSONL missing" >&2
     exit 1
   fi
-  echo "  ✓ metadata dir moved"
-  
-  if [ -d "$SRC_META" ]; then
-    echo "✗ FAILED: source metadata dir still exists" >&2
+  echo "  ✓ destination JSONL exists"
+
+  if [ ! -s "$DST_JSONL" ]; then
+    echo "✗ FAILED: destination JSONL is empty" >&2
     exit 1
+  fi
+  echo "  ✓ destination JSONL non-empty"
+
+  DST_SIZE=$(stat -c%s "$DST_JSONL" 2>/dev/null || stat -f%z "$DST_JSONL" 2>/dev/null || echo "0")
+  if [ "$SRC_SIZE" != "$DST_SIZE" ]; then
+    echo "✗ FAILED: size mismatch (src=$SRC_SIZE dst=$DST_SIZE)" >&2
+    exit 1
+  fi
+  echo "  ✓ size match ($SRC_SIZE bytes)"
+
+  if [ -f "$SRC_JSONL" ]; then
+    echo "✗ FAILED: source JSONL still exists" >&2
+    exit 1
+  fi
+  echo "  ✓ source JSONL removed"
+
+  if [ "$HAS_META" -eq 1 ]; then
+    if [ ! -d "$DST_META" ]; then
+      echo "✗ FAILED: destination metadata dir missing" >&2
+      exit 1
+    fi
+    echo "  ✓ metadata dir moved"
+
+    if [ -d "$SRC_META" ]; then
+      echo "✗ FAILED: source metadata dir still exists" >&2
+      exit 1
+    fi
   fi
 fi
 
@@ -302,4 +311,8 @@ if [ -L "$SYMLINK" ] && [ ! -e "$SYMLINK" ]; then
 fi
 
 echo ""
-echo "✓ Done — session moved to $DST_PROJECT"
+if [ "$REGISTER_ONLY" -eq 1 ]; then
+  echo "✓ Done — session registered under $DST_PROJECT"
+else
+  echo "✓ Done — session moved to $DST_PROJECT"
+fi
